@@ -53,10 +53,18 @@ app.post('/lookup', async (req, res) => {
     );
 
     const clients = clientsRes.data.data || clientsRes.data;
-    const cleanPhone = phone.replace(/\D/g, '');
+
+    // Clean phone: remove non-digits, then strip leading 1 if 11 digits (US country code)
+    let cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('1')) {
+      cleanPhone = cleanPhone.substring(1);
+    }
 
     const client = clients.find(c => {
-      const clientPhone = (c.primaryPhoneNumber || '').replace(/\D/g, '');
+      let clientPhone = (c.primaryPhoneNumber || '').replace(/\D/g, '');
+      if (clientPhone.length === 11 && clientPhone.startsWith('1')) {
+        clientPhone = clientPhone.substring(1);
+      }
       return clientPhone === cleanPhone;
     });
 
