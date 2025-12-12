@@ -1,0 +1,13 @@
+{
+  "name": "caller-id-lookup",
+  "version": "1.0.0",
+  "description": "Retell AI inbound webhook for caller identification",
+  "main": "caller-id-lookup.js",
+  "scripts": {
+    "start": "node caller-id-lookup.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0"
+  }
+}
