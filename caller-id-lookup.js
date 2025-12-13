@@ -31,9 +31,28 @@ async function getToken() {
 
 app.post('/lookup', async (req, res) => {
   try {
-    const { phone } = req.body;
+    // Handle Retell AI inbound webhook format
+    const { event, call_inbound } = req.body;
+
+    // Extract phone from inbound webhook or direct call
+    const phone = call_inbound?.from_number || req.body.phone;
 
     if (!phone) {
+      // Return in Retell inbound webhook format
+      if (event === 'call_inbound') {
+        return res.json({
+          call_inbound: {
+            dynamic_variables: {
+              existing_customer: 'false',
+              first_name: '',
+              last_name: '',
+              client_id: '',
+              email: ''
+            }
+          }
+        });
+      }
+      // Fallback for direct calls
       return res.json({
         existing_customer: false,
         first_name: null,
@@ -70,6 +89,20 @@ app.post('/lookup', async (req, res) => {
 
     if (!client) {
       // New customer - return null values
+      if (event === 'call_inbound') {
+        return res.json({
+          call_inbound: {
+            dynamic_variables: {
+              existing_customer: 'false',
+              first_name: '',
+              last_name: '',
+              client_id: '',
+              email: '',
+              phone: phone
+            }
+          }
+        });
+      }
       return res.json({
         existing_customer: false,
         first_name: null,
@@ -83,6 +116,23 @@ app.post('/lookup', async (req, res) => {
     // Existing customer - return their info for Retell dynamic variables
     console.log('Found existing customer:', client.firstName, client.lastName);
 
+    // Return in Retell inbound webhook format
+    if (event === 'call_inbound') {
+      return res.json({
+        call_inbound: {
+          dynamic_variables: {
+            existing_customer: 'true',
+            first_name: client.firstName || '',
+            last_name: client.lastName || '',
+            client_id: client.clientId || '',
+            email: client.emailAddress || '',
+            phone: client.primaryPhoneNumber || phone
+          }
+        }
+      });
+    }
+
+    // Fallback for direct calls
     res.json({
       existing_customer: true,
       first_name: client.firstName || null,
@@ -95,13 +145,32 @@ app.post('/lookup', async (req, res) => {
   } catch (error) {
     console.error('Caller ID lookup error:', error.message);
     // On error, return as new customer to not block the call
+    const { event, call_inbound } = req.body;
+    const phone = call_inbound?.from_number || req.body.phone;
+
+    if (event === 'call_inbound') {
+      return res.json({
+        call_inbound: {
+          dynamic_variables: {
+            existing_customer: 'false',
+            first_name: '',
+            last_name: '',
+            client_id: '',
+            email: '',
+            phone: phone || '',
+            error: error.message
+          }
+        }
+      });
+    }
+
     res.json({
       existing_customer: false,
       first_name: null,
       last_name: null,
       client_id: null,
       email: null,
-      phone: req.body.phone || null,
+      phone: phone || null,
       error: error.message
     });
   }
