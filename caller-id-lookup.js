@@ -55,24 +55,32 @@ function normalizePhone(phone) {
   return clean;
 }
 
-// PARALLEL search - search many pages concurrently to find clients fast
+// PARALLEL search - must complete in <8 seconds for Retell's 10s timeout
 // NOTE: TESTBED has ItemsPerPage bug - must use 10, not 100!
 async function searchClients(authToken, phoneToFind) {
-  const PAGES_PER_BATCH = 20;  // 20 concurrent requests
+  const PAGES_PER_BATCH = 10;  // 10 concurrent requests
   const ITEMS_PER_PAGE = 10;   // TESTBED BUG: only works with 10!
-  const MAX_BATCHES = 50;      // 50 batches = 1000 pages = 10,000 clients
+  const MAX_BATCHES = 5;       // 5 batches = 50 pages = 500 clients (TESTBED is small)
+  const startTime = Date.now();
+  const MAX_TIME_MS = 7000;    // Stop after 7 seconds to stay under Retell's 10s
 
   for (let batch = 0; batch < MAX_BATCHES; batch++) {
+    // Check time limit
+    if (Date.now() - startTime > MAX_TIME_MS) {
+      console.log(`[Search] Time limit reached at batch ${batch + 1}`);
+      break;
+    }
+
     const startPage = batch * PAGES_PER_BATCH + 1;
     const pagePromises = [];
 
-    // Launch 10 parallel requests
+    // Launch parallel requests
     for (let i = 0; i < PAGES_PER_BATCH; i++) {
       const page = startPage + i;
       pagePromises.push(
         axios.get(
           `${CONFIG.API_URL}/clients?tenantid=${CONFIG.TENANT_ID}&locationid=${CONFIG.LOCATION_ID}&PageNumber=${page}&ItemsPerPage=${ITEMS_PER_PAGE}`,
-          { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }, timeout: 3000 }
+          { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }, timeout: 2000 }
         ).catch(err => ({ data: { data: [] }, error: err.message }))
       );
     }
