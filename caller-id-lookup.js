@@ -56,12 +56,11 @@ function normalizePhone(phone) {
 }
 
 // PARALLEL search - search many pages concurrently to find clients fast
-// Searches up to 20,000 clients (200 pages x 100 per page) in batches
-// NOTE: TESTBED has ItemsPerPage bug but using 100 should still work for parallel search
+// NOTE: TESTBED has ItemsPerPage bug - must use 10, not 100!
 async function searchClients(authToken, phoneToFind) {
-  const PAGES_PER_BATCH = 10;  // 10 concurrent requests
-  const ITEMS_PER_PAGE = 100;  // 100 clients per page
-  const MAX_BATCHES = 20;      // 20 batches = 200 pages = 20,000 clients
+  const PAGES_PER_BATCH = 20;  // 20 concurrent requests
+  const ITEMS_PER_PAGE = 10;   // TESTBED BUG: only works with 10!
+  const MAX_BATCHES = 50;      // 50 batches = 1000 pages = 10,000 clients
 
   for (let batch = 0; batch < MAX_BATCHES; batch++) {
     const startPage = batch * PAGES_PER_BATCH + 1;
