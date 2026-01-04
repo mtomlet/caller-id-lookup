@@ -79,34 +79,25 @@ app.post('/lookup', async (req, res) => {
     const cleanPhone = normalizePhone(phone);
     const authToken = await getToken();
 
-    // Search Meevo clients with pagination
-    let client = null;
-    let pageNumber = 1;
-    const maxPages = 50;
+    // Simple single-page lookup
+    const clientsRes = await axios.get(
+      `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&format=json`,
+      { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
+    );
 
-    while (!client && pageNumber <= maxPages) {
-      const clientsRes = await axios.get(
-        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${pageNumber}&format=json`,
-        { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
-      );
+    const clients = clientsRes.data.data || clientsRes.data || [];
 
-      const clients = clientsRes.data.data || clientsRes.data;
-      if (!clients || clients.length === 0) break;
+    const client = clients.find(c => {
+      // Check primaryPhoneNumber
+      const primaryPhone = normalizePhone(c.primaryPhoneNumber);
+      if (primaryPhone === cleanPhone) return true;
 
-      client = clients.find(c => {
-        // Check both primaryPhoneNumber and phoneNumbers array
-        const primaryPhone = normalizePhone(c.primaryPhoneNumber);
-        if (primaryPhone === cleanPhone) return true;
-
-        // Also check phoneNumbers array
-        if (c.phoneNumbers && c.phoneNumbers.length > 0) {
-          return c.phoneNumbers.some(p => normalizePhone(p.number) === cleanPhone);
-        }
-        return false;
-      });
-
-      pageNumber++;
-    }
+      // Also check phoneNumbers array
+      if (c.phoneNumbers && c.phoneNumbers.length > 0) {
+        return c.phoneNumbers.some(p => normalizePhone(p.number) === cleanPhone);
+      }
+      return false;
+    });
 
     if (!client) {
       // New customer
