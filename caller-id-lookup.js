@@ -186,22 +186,38 @@ app.post('/lookup', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', environment: 'TESTBED' }));
 
-// Debug endpoint to test Meevo connection
+// Debug endpoint - search all pages for a phone
 app.get('/debug', async (req, res) => {
   try {
+    const searchPhone = normalizePhone(req.query.phone || '');
     const authToken = await getToken();
-    const clientsRes = await axios.get(
-      `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&format=json`,
-      { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
-    );
-    const clients = clientsRes.data.data || clientsRes.data;
+    let allClients = [];
+    let page = 1;
+
+    while (page <= 20) {
+      const clientsRes = await axios.get(
+        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${page}&format=json`,
+        { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
+      );
+      const clients = clientsRes.data.data || clientsRes.data || [];
+      if (!clients.length) break;
+      allClients = allClients.concat(clients);
+      page++;
+    }
+
+    const found = searchPhone ? allClients.find(c =>
+      normalizePhone(c.primaryPhoneNumber) === searchPhone ||
+      (c.phoneNumbers || []).some(p => normalizePhone(p.number) === searchPhone)
+    ) : null;
+
     res.json({
-      success: true,
-      client_count: Array.isArray(clients) ? clients.length : 'not array',
-      sample: Array.isArray(clients) ? clients.slice(0, 2).map(c => ({ name: c.firstName + ' ' + c.lastName, phone: c.primaryPhoneNumber })) : clients
+      total_clients: allClients.length,
+      pages_searched: page - 1,
+      search_phone: searchPhone || 'none',
+      found: found ? { name: found.firstName + ' ' + found.lastName, phone: found.primaryPhoneNumber, id: found.clientId } : null
     });
   } catch (err) {
-    res.json({ success: false, error: err.message, response: err.response?.data });
+    res.json({ success: false, error: err.message });
   }
 });
 
