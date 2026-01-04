@@ -195,5 +195,24 @@ app.post('/lookup', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', environment: 'TESTBED' }));
 
+// Debug endpoint to test Meevo connection
+app.get('/debug', async (req, res) => {
+  try {
+    const authToken = await getToken();
+    const clientsRes = await axios.get(
+      `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&format=json`,
+      { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
+    );
+    const clients = clientsRes.data.data || clientsRes.data;
+    res.json({
+      success: true,
+      client_count: Array.isArray(clients) ? clients.length : 'not array',
+      sample: Array.isArray(clients) ? clients.slice(0, 2).map(c => ({ name: c.firstName + ' ' + c.lastName, phone: c.primaryPhoneNumber })) : clients
+    });
+  } catch (err) {
+    res.json({ success: false, error: err.message, response: err.response?.data });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Caller ID lookup running on port ${PORT}`));
