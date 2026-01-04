@@ -2,6 +2,18 @@ const express = require('express');
 const axios = require('axios');
 
 const app = express();
+
+// CORS middleware for Retell AI
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 
 const CONFIG = {
@@ -29,7 +41,8 @@ async function getToken() {
   return token;
 }
 
-app.post('/lookup', async (req, res) => {
+// Shared lookup handler for both /lookup and / routes
+async function handleLookup(req, res) {
   try {
     const { event, call_inbound } = req.body;
 
@@ -183,9 +196,24 @@ app.post('/lookup', async (req, res) => {
       message: 'Lookup failed - treating as new customer'
     });
   }
-});
+}
+
+// Route handlers - both / and /lookup use the same handler
+app.post('/lookup', handleLookup);
+app.post('/', handleLookup);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Catch-all for debugging unknown routes
+app.use((req, res) => {
+  console.log(`[Caller ID Lookup] 404 - Unknown route: ${req.method} ${req.path}`);
+  res.status(404).json({
+    error: 'Not found',
+    path: req.path,
+    method: req.method,
+    hint: 'Use POST /lookup with { "phone": "+1..." }'
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Caller ID lookup server running on port ${PORT}`));
