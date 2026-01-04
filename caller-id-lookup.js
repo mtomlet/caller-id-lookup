@@ -83,27 +83,42 @@ async function handleLookup(req, res) {
 
     const authToken = await getToken();
 
-    // Look up client by phone
-    const clientsRes = await axios.get(
-      `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}`,
-      { headers: { Authorization: `Bearer ${authToken}` }}
-    );
-
-    const clients = clientsRes.data.data || clientsRes.data;
-
     // Clean phone: remove non-digits, then strip leading 1 if 11 digits (US country code)
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length === 11 && cleanPhone.startsWith('1')) {
       cleanPhone = cleanPhone.substring(1);
     }
 
-    const client = clients.find(c => {
-      let clientPhone = (c.primaryPhoneNumber || '').replace(/\D/g, '');
-      if (clientPhone.length === 11 && clientPhone.startsWith('1')) {
-        clientPhone = clientPhone.substring(1);
+    // Look up client by phone - PAGINATE through ALL pages
+    let client = null;
+    let pageNumber = 1;
+    const maxPages = 100; // Safety limit
+
+    while (!client && pageNumber <= maxPages) {
+      const clientsRes = await axios.get(
+        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${pageNumber}`,
+        { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
+      );
+
+      const clients = clientsRes.data.data || clientsRes.data;
+
+      if (!clients || clients.length === 0) {
+        console.log(`[Caller ID Lookup] No more clients at page ${pageNumber}`);
+        break;
       }
-      return clientPhone === cleanPhone;
-    });
+
+      console.log(`[Caller ID Lookup] Searching page ${pageNumber} (${clients.length} clients)`);
+
+      client = clients.find(c => {
+        let clientPhone = (c.primaryPhoneNumber || '').replace(/\D/g, '');
+        if (clientPhone.length === 11 && clientPhone.startsWith('1')) {
+          clientPhone = clientPhone.substring(1);
+        }
+        return clientPhone === cleanPhone;
+      });
+
+      pageNumber++;
+    }
 
     if (!client) {
       console.log(`[Caller ID Lookup] No existing customer found for phone: ${phone}`);
