@@ -86,8 +86,8 @@ app.post('/lookup', async (req, res) => {
 
     while (!client && pageNumber <= maxPages) {
       const clientsRes = await axios.get(
-        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${pageNumber}`,
-        { headers: { Authorization: `Bearer ${authToken}` }}
+        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${pageNumber}&format=json`,
+        { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }}
       );
 
       const clients = clientsRes.data.data || clientsRes.data;
