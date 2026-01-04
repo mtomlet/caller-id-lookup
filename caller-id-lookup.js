@@ -31,15 +31,19 @@ async function getToken() {
 
 app.post('/lookup', async (req, res) => {
   try {
-    // Handle Retell AI inbound webhook format
     const { event, call_inbound } = req.body;
 
-    // Extract phone from inbound webhook or direct call
+    // Detect request type:
+    // 1. Inbound webhook: has event='call_inbound' and call_inbound.from_number
+    // 2. Mid-call function: has phone field directly (E.164 format like +1...)
+    const isInboundWebhook = event === 'call_inbound';
     const phone = call_inbound?.from_number || req.body.phone;
 
+    console.log(`[Caller ID Lookup] Request type: ${isInboundWebhook ? 'INBOUND_WEBHOOK' : 'MID_CALL_FUNCTION'}, Phone: ${phone || 'none'}`);
+
     if (!phone) {
-      // Return in Retell inbound webhook format
-      if (event === 'call_inbound') {
+      console.log('[Caller ID Lookup] No phone provided');
+      if (isInboundWebhook) {
         return res.json({
           call_inbound: {
             dynamic_variables: {
@@ -52,14 +56,15 @@ app.post('/lookup', async (req, res) => {
           }
         });
       }
-      // Fallback for direct calls
+      // Mid-call function format - simple flat response
       return res.json({
         existing_customer: false,
         first_name: null,
         last_name: null,
         client_id: null,
         email: null,
-        phone: null
+        phone: null,
+        message: 'No phone number provided'
       });
     }
 
@@ -88,8 +93,8 @@ app.post('/lookup', async (req, res) => {
     });
 
     if (!client) {
-      // New customer - return null values
-      if (event === 'call_inbound') {
+      console.log(`[Caller ID Lookup] No existing customer found for phone: ${phone}`);
+      if (isInboundWebhook) {
         return res.json({
           call_inbound: {
             dynamic_variables: {
@@ -103,28 +108,29 @@ app.post('/lookup', async (req, res) => {
           }
         });
       }
+      // Mid-call function format
       return res.json({
         existing_customer: false,
         first_name: null,
         last_name: null,
         client_id: null,
         email: null,
-        phone: phone
+        phone: phone,
+        message: 'New customer - no profile found'
       });
     }
 
-    // Existing customer - return their info for Retell dynamic variables
-    console.log('Found existing customer:', client.firstName, client.lastName);
+    // Existing customer found
+    console.log(`[Caller ID Lookup] Found existing customer: ${client.firstName} ${client.lastName} (ID: ${client.clientId})`);
 
-    // Return in Retell inbound webhook format
-    if (event === 'call_inbound') {
+    if (isInboundWebhook) {
       return res.json({
         call_inbound: {
           dynamic_variables: {
             existing_customer: 'true',
             first_name: client.firstName || '',
             last_name: client.lastName || '',
-            client_id: client.clientId || '',
+            client_id: String(client.clientId) || '',
             email: client.emailAddress || '',
             phone: client.primaryPhoneNumber || phone
           }
@@ -132,23 +138,24 @@ app.post('/lookup', async (req, res) => {
       });
     }
 
-    // Fallback for direct calls
+    // Mid-call function format - simple flat response for Retell custom function
     res.json({
       existing_customer: true,
       first_name: client.firstName || null,
       last_name: client.lastName || null,
       client_id: client.clientId,
       email: client.emailAddress || null,
-      phone: client.primaryPhoneNumber || phone
+      phone: client.primaryPhoneNumber || phone,
+      message: 'Existing customer found'
     });
 
   } catch (error) {
-    console.error('Caller ID lookup error:', error.message);
-    // On error, return as new customer to not block the call
+    console.error('[Caller ID Lookup] Error:', error.message);
     const { event, call_inbound } = req.body;
     const phone = call_inbound?.from_number || req.body.phone;
+    const isInboundWebhook = event === 'call_inbound';
 
-    if (event === 'call_inbound') {
+    if (isInboundWebhook) {
       return res.json({
         call_inbound: {
           dynamic_variables: {
@@ -164,6 +171,7 @@ app.post('/lookup', async (req, res) => {
       });
     }
 
+    // Mid-call function format
     res.json({
       existing_customer: false,
       first_name: null,
@@ -171,7 +179,8 @@ app.post('/lookup', async (req, res) => {
       client_id: null,
       email: null,
       phone: phone || null,
-      error: error.message
+      error: error.message,
+      message: 'Lookup failed - treating as new customer'
     });
   }
 });
