@@ -79,18 +79,34 @@ app.post('/lookup', async (req, res) => {
     const cleanPhone = normalizePhone(phone);
     const authToken = await getToken();
 
-    // Search Meevo clients
-    const clientsRes = await axios.get(
-      `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}`,
-      { headers: { Authorization: `Bearer ${authToken}` }}
-    );
+    // Search Meevo clients with pagination
+    let client = null;
+    let pageNumber = 1;
+    const maxPages = 50;
 
-    const clients = clientsRes.data.data || clientsRes.data;
+    while (!client && pageNumber <= maxPages) {
+      const clientsRes = await axios.get(
+        `${CONFIG.API_URL}/clients?TenantId=${CONFIG.TENANT_ID}&LocationId=${CONFIG.LOCATION_ID}&PageNumber=${pageNumber}`,
+        { headers: { Authorization: `Bearer ${authToken}` }}
+      );
 
-    const client = clients.find(c => {
-      const clientPhone = normalizePhone(c.primaryPhoneNumber);
-      return clientPhone === cleanPhone;
-    });
+      const clients = clientsRes.data.data || clientsRes.data;
+      if (!clients || clients.length === 0) break;
+
+      client = clients.find(c => {
+        // Check both primaryPhoneNumber and phoneNumbers array
+        const primaryPhone = normalizePhone(c.primaryPhoneNumber);
+        if (primaryPhone === cleanPhone) return true;
+
+        // Also check phoneNumbers array
+        if (c.phoneNumbers && c.phoneNumbers.length > 0) {
+          return c.phoneNumbers.some(p => normalizePhone(p.number) === cleanPhone);
+        }
+        return false;
+      });
+
+      pageNumber++;
+    }
 
     if (!client) {
       // New customer
