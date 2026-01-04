@@ -57,12 +57,13 @@ function normalizePhone(phone) {
 
 // FAST search - must complete in <8 seconds for Retell's 10s timeout
 // Search /clients endpoint with limited pages for speed
+// NOTE: TESTBED Meevo API bug - different ItemsPerPage returns different clients! Using 10.
 async function searchClients(authToken, phoneToFind) {
-  // Only search first 10 pages (200 clients) - must be fast!
-  for (let page = 1; page <= 10; page++) {
+  // Only search first 20 pages (200 clients) - must be fast!
+  for (let page = 1; page <= 20; page++) {
     try {
       const res = await axios.get(
-        `${CONFIG.API_URL}/clients?tenantid=${CONFIG.TENANT_ID}&locationid=${CONFIG.LOCATION_ID}&PageNumber=${page}&ItemsPerPage=20`,
+        `${CONFIG.API_URL}/clients?tenantid=${CONFIG.TENANT_ID}&locationid=${CONFIG.LOCATION_ID}&PageNumber=${page}&ItemsPerPage=10`,
         { headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' }, timeout: 5000 }
       );
 
